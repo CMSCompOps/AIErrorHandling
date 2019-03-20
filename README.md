@@ -10,4 +10,4 @@ codes are added under the training/SitesErrorCodes/ codes
 ### Add the log/error files information for training
 a new sub-package under the training can be created under the training directory
 ## models
-API to retrieve the suggestion values
+API to retrieve the suggestion values.
