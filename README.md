@@ -11,3 +11,10 @@ codes are added under the training/SitesErrorCodes/ codes
 a new sub-package under the training can be created under the training directory
 ## models
 API to retrieve the suggestion values.
+
+# Requirements
+* tensorflow
+* workflowwebtools
+* matplotlib
+
+* tkinter
