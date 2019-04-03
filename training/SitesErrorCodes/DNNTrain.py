@@ -9,24 +9,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.legend_handler import HandlerLine2D, HandlerTuple
 import tensorflow as tf
+from tensorflow.contrib import eager
 import tensorflow.keras as keras
 
-from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers import Convolution2D, MaxPooling2D
-from keras.utils import np_utils
-from keras.optimizers import SGD,Adam
-from keras import regularizers
-from keras import metrics
+from tensorflow.keras.models import Sequential, save_model
+from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten
+from tensorflow.keras.layers import Convolution2D, MaxPooling2D
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.optimizers import SGD,Adam
+from tensorflow.keras import regularizers
+from tensorflow.keras import metrics
 from sklearn.metrics import roc_curve,auc,roc_auc_score
-import statistics as stat
 import math
+
+def my_roc_auc_score(y_true , y_pred):
+    return roc_auc_score( y_true.numpy() , y_pred.numpy() )
 
 def auroc(y_true, y_pred):
     """
     create a method to calculated roc score as a metric
     """
-    auroc_py_function = tf.py_function(roc_auc_score, (y_true, y_pred), tf.double)
+    auroc_py_function = eager.py_func(my_roc_auc_score, (y_true, y_pred), tf.double)
     return auroc_py_function
 
 
@@ -156,7 +159,7 @@ class DNNTrain :
             evaluation_i = self.model.evaluate( x_test_sh , y_test_sh , batch_size=self.Fit_batch_size )
             for a in range(0,len(evaluation_i) ):
                 self.EvaluationOnShuffels[a].append( evaluation_i[a] )
-        self.EvaluationOnShuffels = [ (stat.mean(a) , stat.stdev(a)) for a in self.EvaluationOnShuffels ]
+        self.EvaluationOnShuffels = [ (np.mean(a) , np.std(a)) for a in self.EvaluationOnShuffels ]
         x_epochs = range(1,self.Fit_epochs+1)
         plots = {}
         _colors = 'bgrcmykw'
@@ -274,8 +277,7 @@ class DNNTrain :
                    'Model_Flatten' : self.Model_Flatten, 'Model_layers' : self.Model_layers ,
                    'Model_optimizer' : self.Model_optimizer , 'Model_loss': self.Model_loss }
 
-        
-        self.model.save(SitesErrorCodes_path + "/models/" + file_name + ".hdf5")
+        save_model( self.model , SitesErrorCodes_path + "/models/" + file_name + ".hdf5" )
         with open( SitesErrorCodes_path + "/models/" + file_name + '.json', 'w') as fp:
             json.dump({'all_sites':self.Tasks.all_sites ,
                        'all_errors':self.Tasks.all_errors ,
