@@ -1,0 +1,15 @@
+* Christian Contreras :
+** Poster presented at CHEP 2018
+	- [[https://indico.cern.ch/event/587955/contributions/2937424/attachments/1687589/2714264/christian_contreras_chep_2018_poster.pdf]]
+** Talk at Caltech Machine Learning Meeting
+	- [[https://indico.cern.ch/event/759127/contributions/3148275/attachments/1719661/2775585/Christian_Workflow_AI_Assistance.pdf]]
+** Game theory studies
+	- [[https://hbakhshi.web.cern.ch/AIErrorHandling/Workflow_Recovery_Panel_unboxing_model.pdf]]
+* Dominykas Asauskas
+** Summary slides
+	- [[https://indico.cern.ch/event/761037/contributions/3157738/attachments/1724052/2784237/slides.pdf]]
+** Repository 
+	- [[https://github.com/doas3140/OperatorActionPrediction]]
+* Edvinas Naraveckas
+	- [[https://hbakhshi.web.cern.ch/AIErrorHandling/Edvinas_new_WTC_Console.pdf]]
+

@@ -1,5 +1,5 @@
 """
-Thid module contains classes to read contents of tasks and actions from the 'actionhistory' json file, produced by old-console
+This module contains classes to read contents of tasks and actions from the 'actionhistory' json file, produced by old-console
 Here is the list of classes : 
 1. Task : it gets one entry from json file and interpret it. It converts errors-sites to numpy array
 2. Task.Action : details of the action taken by the operator 
@@ -194,12 +194,18 @@ class Tasks :
         self.AllActions = np.array( [tsk.action.code() for tsk in self.AllData ] )
         self.df = DataFrame(data=[tsk.GetInfo() for tsk in self.AllData] , columns=self.AllData[0].GetInfo(True))
 
-    def GetTrainTestDS(self , train_ratio ):
+    def GetShuffledDS(self , n ):
+        p = np.random.permutation( len(self.AllData)  )
+        return self.ErrorsGoodBadSites[ p[:n] ], self.AllActions[p[:n] ]
+        
+    def GetTrainTestDS(self , train_ratio , shuffle=False):
         """
         convert the information to train/test
         :param float train_ratio: number between 0 and 1, the fraction to go for the training
         :ret: train_x, train_y, test_x , test_y
         """
+        if shuffle:
+            self.ErrorsGoodBadSites , self.AllActions = self.GetShuffledDS( len(self.AllData) )
         n = int(train_ratio*len(self.AllData))
         return self.ErrorsGoodBadSites[:n] , self.AllActions[:n] , self.ErrorsGoodBadSites[n:] , self.AllActions[n:]
         

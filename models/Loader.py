@@ -11,9 +11,18 @@ class Loader :
     def __init__(self):
         """
         new models should be added manually to the list of AllModels.
-        """
+        """        
         self.AllModels = []
-        self.AllModels.append( SECML.SiteErrorCodeModelLoader( SitesErrorCodes_path+"/models/FirstTry" ) )
+
+        from os import listdir
+        from os.path import isfile, join, splitext
+
+        sites_errors_models_dir = join(SitesErrorCodes_path,"models")
+        files_sites_errors_models_dir = listdir( sites_errors_models_dir )
+        models_sites_errors_models_dir = set( [ join(sites_errors_models_dir, splitext(f)[0]) for f in files_sites_errors_models_dir if isfile( join(sites_errors_models_dir, f) ) ] )
+        print(models_sites_errors_models_dir)
+        for f in models_sites_errors_models_dir:
+            self.AllModels.append( SECML.SiteErrorCodeModelLoader( f ) )
         
 
     def __call__(self , **inputs):

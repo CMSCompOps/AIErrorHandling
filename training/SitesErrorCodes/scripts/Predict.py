@@ -7,4 +7,4 @@ jj = json.load( open("../data/actionshistory.json") )
 for a in jj :
     jjb = jj[a]['errors']
     #print(jjb)
-    print( Predictor( **jjb  ) )
+    #print( Predictor( **jjb  ) )
