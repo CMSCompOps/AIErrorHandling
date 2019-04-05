@@ -90,7 +90,7 @@ class Task:
                     if TiersOnly:
                         try:
                             site_index = int( site[1] )
-                        except ValueError as err:
+                        except ValueError as errorrrr:
                             site_index = 4
                     else:
                         site_index = all_sites.index( site )

@@ -21,6 +21,7 @@ from tensorflow.keras import regularizers
 from tensorflow.keras import metrics
 from sklearn.metrics import roc_curve,auc,roc_auc_score
 import math
+import os
 
 def my_roc_auc_score(y_true , y_pred):
     return roc_auc_score( y_true.numpy() , y_pred.numpy() )
@@ -287,3 +288,9 @@ class DNNTrain :
                        'model':model_details,
                        'trainingdata':trainingdata_details,
                        'informatino':params} , fp)
+        if not os.path.isdir( SitesErrorCodes_path + "/models/" + file_name ):
+            os.mkdir( SitesErrorCodes_path + "/models/" + file_name )
+        plt.switch_backend('agg')
+        self.PlotFitAndTestMetrics().savefig( SitesErrorCodes_path + "/models/" + file_name + '/Metrics.png' )
+        self.ROC().savefig( SitesErrorCodes_path + "/models/" + file_name + '/ROC.png' )
+        self.OverTrainingPlot().savefig( SitesErrorCodes_path + "/models/" + file_name + '/OverTrainingPlot.png' )

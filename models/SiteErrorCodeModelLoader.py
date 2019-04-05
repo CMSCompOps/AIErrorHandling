@@ -58,7 +58,7 @@ class SiteErrorCodeModelLoader :
             #print good_sites
             #print bad_sites
 
-        self.Task.normalize_errors( good_sites , bad_sites , self.TiersOnly )
+        self.Task.normalize_errors( good_sites , bad_sites , TiersOnly=self.TiersOnly )
         prediction = self.model.predict( np.array( [ self.Task.Get2DArrayOfErrors() ] ) )
         PRED = str(prediction)
         if self.IsBinary:
