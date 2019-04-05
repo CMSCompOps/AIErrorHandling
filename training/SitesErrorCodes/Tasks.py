@@ -8,8 +8,7 @@ One can ask Tasks class to categorize tasks based on the site-tier instead of si
 
 :author: Hamed Bakhshiansohi <hbakhshi@cern.ch>
 """
-
-import WorkflowWebTools as wwt
+import workflowwebtools as wwt
 from pandas import DataFrame
 
 import json

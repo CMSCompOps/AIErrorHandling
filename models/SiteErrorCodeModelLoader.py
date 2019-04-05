@@ -9,8 +9,8 @@ import tensorflow.keras as keras
 from AIErrorHandling.training.SitesErrorCodes.Tasks import Task
 from . import Prediction
 
-from WorkflowWebTools import workflowinfo
-from CMSToolBox import sitereadiness
+from workflowwebtools import workflowinfo
+from cmstoolbox import sitereadiness
 
 
 class SiteErrorCodeModelLoader :
