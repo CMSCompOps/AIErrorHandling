@@ -5,7 +5,13 @@ a class to load a model that has been trained using the table of sites and error
 
 import numpy as np
 import json
+
+from tensorflow import logging
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import tensorflow.keras as keras
+
 from AIErrorHandling.training.SitesErrorCodes.Tasks import Task
 from . import Prediction
 
@@ -19,7 +25,7 @@ class SiteErrorCodeModelLoader :
         loads the trained model
         :param str model_file_name: two files are expected to exist in this address : one json and one hdf5 file. They should be stored using the SaveModel method of the DNNTrain class
         """
-        #self.model = keras.models.load_model( model_file_name + ".hdf5" )
+        logging.set_verbosity(logging.ERROR)
         self.model = keras.models.load_model( model_file_name + ".hdf5" , compile=False )
         JSON = json.load( open(model_file_name + ".json" ) )
         self.all_sites = list(JSON['all_sites'])
