@@ -20,9 +20,7 @@ class Loader :
         sites_errors_models_dir = join(SitesErrorCodes_path,"models")
         files_sites_errors_models_dir = listdir( sites_errors_models_dir )
         models_sites_errors_models_dir = set( [ join(sites_errors_models_dir, splitext(f)[0]) for f in files_sites_errors_models_dir if isfile( join(sites_errors_models_dir, f) ) ] )
-        print(models_sites_errors_models_dir)
         for f in models_sites_errors_models_dir:
-            print f
             self.AllModels.append( SECML.SiteErrorCodeModelLoader( f ) )
         
 
