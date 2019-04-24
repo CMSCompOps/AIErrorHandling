@@ -8,5 +8,5 @@ def predict(request):
                 "tsk" : request.POST.tsk,
                 })
         return JsonResponse(response)
-    else:
+    except:
         return HttpResponseBadRequest()
