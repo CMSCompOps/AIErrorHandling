@@ -1,5 +1,5 @@
 # AIErrorHandling
-Tools to produce suggestion for the CMS workflow failures recovery panel. 
+Tools to produce suggestion for the CMS workflow failures recovery panel.
 The idea is to train neural networks based on the previous actions and the details of the failed jobs. 
 
 There are two subdirectories :
@@ -16,5 +16,5 @@ API to retrieve the suggestion values.
 * tensorflow
 * workflowwebtools
 * matplotlib
-
+* django2.2
 * tkinter
