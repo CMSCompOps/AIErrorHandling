@@ -12,6 +12,13 @@ a new sub-package under the training can be created under the training directory
 ## models
 API to retrieve the suggestion values.
 
+Testing API
+```
+curl -d "wf=prebello_HIRun2018A-v1-HIHardProbesPeripheral-04Apr2019_1033p1_190404_203542_6929 \
+     &tsk=/prebello_HIRun2018A-v1-HIHardProbesPeripheral-04Apr2019_1033p1_190404_203542_6929/DataProcessing" \
+     -X POST http://localhost:8050/predict/
+```
+
 # Requirements
 * tensorflow
 * workflowwebtools
