@@ -24,10 +24,10 @@ def predict(request):
                 if not tsk :
                         return HttpResponseBadRequest("tsk parameter is not set")
 
-                try:
-                        pred = Predictor( **{"wf": wf , "tsk":tsk } )
-                except BaseException as err:
-                        return HttpResponseBadRequest("can not load the predictions. Problem could be with the certificate. Please check log files." + "</br>" +  str(err))
+                #try:
+                pred = Predictor( **{"wf": wf , "tsk":tsk } )
+                #except BaseException as err:
+                #        return HttpResponseBadRequest("can not load the predictions. Problem could be with the certificate. Please check log files." + "</br>" +  str(err))
 
         return JsonResponse( pred , safe=False )
 

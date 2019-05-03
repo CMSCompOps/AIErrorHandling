@@ -1,1 +1,1 @@
-python3.5 manage.py runserver localhost:8050
+python manage.py runserver aieh.cern.ch:8052
