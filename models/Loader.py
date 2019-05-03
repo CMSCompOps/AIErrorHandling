@@ -31,5 +31,7 @@ class Loader :
         :param dict good_sites: map of good sites and number of failed jobs in eash site, like what is provided by 'actionhistory' in old-console
         :param dict bad_sites: map of bad sites and number of failed jobs in eash site, like what is provided by 'actionhistory' in old-console
         """
-        ret = [model(**inputs) for model in self.AllModels]
+        ret = {}
+        for model in self.AllModels:
+            ret[model.Name] = model(**inputs)
         return ret

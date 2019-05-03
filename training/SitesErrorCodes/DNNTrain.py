@@ -19,9 +19,42 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.optimizers import SGD,Adam
 from tensorflow.keras import regularizers
 from tensorflow.keras import metrics
-from sklearn.metrics import roc_curve,auc,roc_auc_score
+from sklearn.metrics import roc_curve,auc,roc_auc_score,f1_score
 import math
 import os
+#from exceptions import RuntimeError
+
+from tensorflow.keras import backend as K
+
+def f1K(y_true, y_pred):
+    def recall(y_true, y_pred):
+        """Recall metric.
+
+        Only computes a batch-wise average of recall.
+
+        Computes the recall, a metric for multi-label classification of
+        how many relevant items are selected.
+        """
+        true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+        possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+        recall = true_positives / (possible_positives + K.epsilon())
+        return recall
+
+    def precision(y_true, y_pred):
+        """Precision metric.
+
+        Only computes a batch-wise average of precision.
+
+        Computes the precision, a metric for multi-label classification of
+        how many selected items are relevant.
+        """
+        true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+        predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+        precision = true_positives / (predicted_positives + K.epsilon())
+        return precision
+    precision = precision(y_true, y_pred)
+    recall = recall(y_true, y_pred)
+    return 2*((precision*recall)/(precision+recall+K.epsilon()))
 
 def my_roc_auc_score(y_true , y_pred):
     return roc_auc_score( y_true.numpy() , y_pred.numpy() )
@@ -32,6 +65,14 @@ def auroc(y_true, y_pred):
     """
     auroc_py_function = eager.py_func(my_roc_auc_score, (y_true, y_pred), tf.double)
     return auroc_py_function
+
+def my_f1(y_true , y_pred):
+    a,b = f1_score( y_true.numpy() , y_pred.numpy() )
+    return a
+
+def f1(y_true, y_pred):
+    f1_py_function = eager.py_func( my_f1 , (y_true, y_pred) , tf.double )
+    return f1_py_function
 
 
 def top_first_categorical_accuracy(kk , name):
@@ -63,13 +104,14 @@ class DNNTrain :
         if self.Tasks.IsBinary :
             self.Y_train = self.y_train.astype('int16')
             self.Y_test = self.y_test.astype('int16')
+            print( self.Y_test ) 
         else:
-            self.Y_train = np_utils.to_categorical(self.y_train, len(tasks.all_actions) , 'int8')
-            self.Y_test = np_utils.to_categorical(self.y_test, len(tasks.all_actions) , 'int8')
+            self.Y_train = to_categorical(self.y_train, len(tasks.all_actions) , 'int8')
+            self.Y_test = to_categorical(self.y_test, len(tasks.all_actions) , 'int8')
 
-        print( set( self.Y_test ) )
-
-    def MakeModel(self, flatten=True , layers=[] , optimizer='adam' , loss='categorical_crossentropy' ):
+        self.AllFigures = {}
+            
+    def MakeModel(self, flatten=True , layers=[] , optimizer='adam' , loss=None ):
         """
         to make the model and compile it, if the input are binary a layer with sigmoid activation is added at the end. otherwise, a layer with softmax is inserted
         :param bool flatten: by default for the Task object it should be true
@@ -99,11 +141,20 @@ class DNNTrain :
 
         if self.Tasks.IsBinary :
             self.model.add( Dense( 1 , activation='sigmoid' , kernel_initializer=keras.initializers.RandomNormal(seed=random_seed*3) , bias_initializer=keras.initializers.RandomNormal(seed=random_seed*4) ) )
+            if not loss:
+                loss = "binary_crossentropy"
+
+            metrics_ = [ 'accuracy' , auroc , f1K  ]
         else:
             self.model.add( Dense( len(self.Tasks.all_actions) ,
                                    activation='softmax' ,
                                    kernel_initializer=keras.initializers.RandomNormal(seed=random_seed*5),
                                    bias_initializer=keras.initializers.RandomNormal(seed=random_seed*6) ) )
+
+            if not loss :
+                loss = "categorical_crossentropy"
+
+            metrics_ = ['categorical_accuracy' , top_first_categorical_accuracy(1,"kfirst"), top_first_categorical_accuracy(2,"kfirsttwo"),top_first_categorical_accuracy(3,"kfirstthree")]
 
             
         if optimizer == "sgd" :
@@ -114,10 +165,9 @@ class DNNTrain :
             Optimizer = optimizer
 
         self.model.compile(
-            loss=loss ,#'categorical_crossentropy', 'mean_squared_error', 'categorical_crossentropy' 'mean_absolute_error'
+            loss=loss,#'mean_squared_error', 'mean_absolute_error'
             optimizer=Optimizer,
-            metrics=['accuracy' , auroc]
-            # , 'categorical_accuracy' , top_first_categorical_accuracy(1,"kfirst"), top_first_categorical_accuracy(2,"kfirsttwo"),top_first_categorical_accuracy(3,"kfirstthree")]
+            metrics=metrics_
         )
 
     def Fit(self,batch_size=100, epochs=10 , validation_split=0.0 , verbose=1):
@@ -185,7 +235,7 @@ class DNNTrain :
             return self.OvertrainingPlot
         if not hasattr(self, "FitHistory"):
             self.Fit()
-        self.ROC()
+        #self.ROC()
 
         y_sig_train = self.Pred_on_Train[ self.Y_train > 0.5 ]
         y_bkg_train = self.Pred_on_Train[ self.Y_train < 0.5 ]
@@ -212,6 +262,38 @@ class DNNTrain :
         
         return self.OvertrainingPlot
         
+
+    def PlotPredictionForActions(self , ACTION_INDEX , ttc=0):
+        """
+        Plot predictions for all the tasks with a given action. It returns the produced plot.
+        :param int ACTION_INDEX: the index of the action
+        :param str ttc: 0 for test dataset, 1 for train dataset, 2 for test+train
+        """
+        if self.Tasks.IsBinary :
+            raise RuntimeError("DNNTrain::PlotPredictionForActions is not callable for binary datasets")
+        if ACTION_INDEX >= len(self.Tasks.all_actions) :
+            raise RuntimeError("DNNTrain::PlotPredictionForActions is called with an ACTION_INDEX greater than available actions")
+        
+        truth = [ i==ACTION_INDEX for i in range(len(self.Tasks.all_actions) ) ]
+        prediction_on_train_1 = self.Pred_on_Train[ np.all( self.Y_train == truth , 1)]
+        prediction_on_test_1 = self.Pred_on_Test[ np.all( self.Y_test == truth , 1)]
+        if ttc==0:
+            prediction = prediction_on_test_1
+        elif ttc==1:
+            prediction = prediction_on_train_1
+        elif ttc==2:
+            prediction = np.concatenate( (prediction_on_test_1 , prediction_on_train_1) )
+        else:
+            raise RuntimeError("DNNTrain::PlotPredictionForActions ttc parameter should be 0,1 or 2. %d is given" % ttc)
+        argsorted = prediction.argsort()
+        a = np.take_along_axis( prediction , argsorted , 1 )
+
+        figName = "PlotPredictionForActions%d" % ACTION_INDEX
+        self.AllFigures[figName] = plt.figure()
+        plt.hist( [ prediction[:,0]/a[:,3] , prediction[:,1]/a[:,3] , prediction[:,2]/a[:,3] , prediction[:,3]/a[:,3] ] , density=True , histtype='step' , color=['r', 'g' , 'b', 'y' ] , label=self.Tasks.all_actions  )
+        plt.legend(loc='best')
+        plt.title( "Predictions for " + self.Tasks.all_actions[ACTION_INDEX] + " actions")
+        return self.AllFigures[figName]
     
     def ROC(self):
         """
@@ -292,5 +374,11 @@ class DNNTrain :
             os.mkdir( SitesErrorCodes_path + "/models/" + file_name )
         plt.switch_backend('agg')
         self.PlotFitAndTestMetrics().savefig( SitesErrorCodes_path + "/models/" + file_name + '/Metrics.png' )
-        self.ROC().savefig( SitesErrorCodes_path + "/models/" + file_name + '/ROC.png' )
-        self.OverTrainingPlot().savefig( SitesErrorCodes_path + "/models/" + file_name + '/OverTrainingPlot.png' )
+        if self.Tasks.IsBinary:
+            self.ROC().savefig( SitesErrorCodes_path + "/models/" + file_name + '/ROC.png' )
+            self.OverTrainingPlot().savefig( SitesErrorCodes_path + "/models/" + file_name + '/OverTrainingPlot.png' )
+        else :
+            for action_index in range(0,len(self.Tasks.all_actions) ) :
+                self.PlotPredictionForActions( action_index , 0 ).savefig( SitesErrorCodes_path + "/models/" + file_name + "/pred_for_action%d_intest.png" % action_index )
+                self.PlotPredictionForActions( action_index , 1 ).savefig( SitesErrorCodes_path + "/models/" + file_name + "/pred_for_action%d_intrain.png" % action_index )
+                self.PlotPredictionForActions( action_index , 2 ).savefig( SitesErrorCodes_path + "/models/" + file_name + "/pred_for_action%d_inall.png" % action_index )
