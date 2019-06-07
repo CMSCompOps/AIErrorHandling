@@ -70,8 +70,8 @@ class SiteErrorCodeModelLoader :
                             good_sites.setdefault( err , {} )[ site ] = errors[err][site]
                         else:
                             bad_sites.setdefault( err , {} )[ site ] = errors[err][site]
-                #print good_sites
-                #print bad_sites
+                print( good_sites)
+                print (bad_sites)
 
         self.Task.normalize_errors( good_sites , bad_sites , TiersOnly=self.TiersOnly )
         with TheTFGraph.as_default():
