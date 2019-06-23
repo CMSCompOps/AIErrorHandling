@@ -26,6 +26,7 @@ import os
 
 from tensorflow.keras import backend as K
 
+
 def f1K(y_true, y_pred):
     def recall(y_true, y_pred):
         """Recall metric.
@@ -88,30 +89,34 @@ def top_first_categorical_accuracy(kk , name):
     return ktop
 
 class DNNTrain :
-    def __init__(self , tasks , train_ratio=0.8):
+    def __init__(self ,x_train = None, y_train = None, x_val = None, y_val = None , x_test = None , y_test = None , tasks = None , train_ratio = None ): #, tasks , train_ratio=0.8):
         """
         :param Tasks tasks: an instance of Tasks class
         :param float train_ratio: a number beween 0 and 1, specifying the ratio of data that is to be used for training
         """
-        self.Fit_train_ratio = train_ratio
-        
-        self.Tasks = tasks
-        self.X_train, self.y_train, self.X_test, self.y_test = tasks.GetTrainTestDS( train_ratio , True )
+        if tasks and train_ratio:        
+            self.Fit_train_ratio = train_ratio
 
-        self.X_train = self.X_train.astype('int16')
-        self.X_test = self.X_test.astype('int16')
+            self.Tasks = tasks
+            x_val, y_val , self.X_train, self.Y_train, self.X_test, self.Y_test = tasks.GetTrainTestDS( train_ratio , True )
 
-        if self.Tasks.IsBinary :
-            self.Y_train = self.y_train.astype('int16')
-            self.Y_test = self.y_test.astype('int16')
-            print( self.Y_test ) 
-        else:
-            self.Y_train = to_categorical(self.y_train, len(tasks.all_actions) , 'int8')
-            self.Y_test = to_categorical(self.y_test, len(tasks.all_actions) , 'int8')
+            self.X_val = None
+            self.Y_val = None
+        else :
+            self.Fit_train_ratio = -1
 
+            self.Tasks = tasks
+            self.Y_train = y_train
+            self.Y_test = y_test
+            self.Y_val = y_val
+
+            self.X_train = x_train
+            self.X_test = x_test
+            self.X_val = x_val
+                
         self.AllFigures = {}
             
-    def MakeModel(self, flatten=True , layers=[] , optimizer='adam' , loss=None ):
+    def MakeModel(self, flatten=True , layers=[] , optimizer='adam' , loss=None , LR = 0.001 , moremetrics = [] ):
         """
         to make the model and compile it, if the input are binary a layer with sigmoid activation is added at the end. otherwise, a layer with softmax is inserted
         :param bool flatten: by default for the Task object it should be true
@@ -156,11 +161,12 @@ class DNNTrain :
 
             metrics_ = ['categorical_accuracy' , top_first_categorical_accuracy(1,"kfirst"), top_first_categorical_accuracy(2,"kfirsttwo"),top_first_categorical_accuracy(3,"kfirstthree")]
 
+        metrics_ += moremetrics
             
         if optimizer == "sgd" :
             Optimizer = SGD(lr=.5)
         elif optimizer == "adam":
-            Optimizer =  Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+            Optimizer =  Adam(lr=LR, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
         else :
             Optimizer = optimizer
 
@@ -170,22 +176,31 @@ class DNNTrain :
             metrics=metrics_
         )
 
-    def Fit(self,batch_size=100, epochs=10 , validation_split=0.0 , verbose=1):
+    def Fit(self,batch_size=100, epochs=10 , validation_split=0.0 , verbose=1 , weight=True):
         """
         do the fit of training. standard parameters of keras.Model.fit
         """
         self.Fit_batch_size = batch_size
         self.Fit_epochs = epochs
         self.Fit_validation_split = validation_split
-        
-        self.FitHistory = self.model.fit(self.X_train, self.Y_train, batch_size=batch_size, epochs=epochs, verbose=verbose , validation_split=validation_split )
-        self.Pred_on_Train = self.model.predict( self.X_train )
-        #self.Pred_on_Train_List = zip( self.Pred_on_Train.ravel() , self.Y_train )
-        self.Pred_on_Test =  self.model.predict( self.X_test  )
-        #self.Pred_on_Test_List  = zip( self.Pred_on_Test.ravel()  , self.Y_test )
-        return self.FitHistory
 
-    def PlotFitAndTestMetrics(self , fig=None , nshuffels=100):
+        weights = self.Tasks.ClassCounts
+        #print('weights' , weights)
+        if self.Fit_train_ratio == -1 :
+            self.FitHistory = self.model.fit(self.X_train, self.Y_train, batch_size=batch_size, epochs=epochs,
+                                             verbose=verbose , validation_data=(self.X_val , self.Y_val) , shuffle=False , class_weight=weights if weight else None )
+                                             
+        else:
+            self.FitHistory = self.model.fit(self.X_train, self.Y_train, batch_size=batch_size, epochs=epochs, verbose=verbose,
+                                             validation_split=validation_split , class_weight=weights if weight else None)
+        #print( self.FitHistory.history.keys() )
+        self.Pred_on_Train = self.model.predict( self.X_train )
+        self.Pred_on_Train_List = zip( self.Pred_on_Train.ravel() , self.Y_train )
+        self.Pred_on_Test =  self.model.predict( self.X_test  )
+        self.Pred_on_Test_List  = zip( self.Pred_on_Test.ravel()  , self.Y_test )
+        return self.FitHistory
+    
+    def PlotFitAndTestMetrics(self , fig=None , nshuffels=100 , skipfirstbins=0):
         """
         plot the evolution of metrics and loss during the fit for training and evaluation samples and comapre it with the test results
         if fit has not been done, it is called here with default parameters
@@ -216,8 +231,8 @@ class DNNTrain :
         _colors = 'bgrcmykw'
         for index,metric in enumerate(self.model.metrics_names) :
             color = _colors[index]
-            p_train = plt.plot( x_epochs , self.FitHistory.history[metric] , color, label=metric  , linestyle="-" , linewidth=2 )
-            p_validation = plt.plot( x_epochs , self.FitHistory.history['val_'+metric] , color, label=metric  , linestyle="--" , linewidth=1 )
+            p_train = plt.plot( x_epochs[skipfirstbins:] , self.FitHistory.history[metric][skipfirstbins:] , color, label=metric  , linestyle="-" , linewidth=2 )
+            p_validation = plt.plot( x_epochs[skipfirstbins:] , self.FitHistory.history['val_'+metric][skipfirstbins:] , color, label=metric  , linestyle="--" , linewidth=1 )
             p_test = plt.plot( [self.Fit_epochs] , self.EvaluationTest[index] , color, label=metric  , marker='o' )
             if nshuffels>0 :
                 p_band = plt.errorbar( [self.Fit_epochs] , [self.EvaluationOnShuffels[index][0]] , yerr=[self.EvaluationOnShuffels[index][1]] , fmt=color, label=metric  , marker='x' )
@@ -287,10 +302,9 @@ class DNNTrain :
             raise RuntimeError("DNNTrain::PlotPredictionForActions ttc parameter should be 0,1 or 2. %d is given" % ttc)
         argsorted = prediction.argsort()
         a = np.take_along_axis( prediction , argsorted , 1 )
-
         figName = "PlotPredictionForActions%d" % ACTION_INDEX
         self.AllFigures[figName] = plt.figure()
-        plt.hist( [ prediction[:,0]/a[:,3] , prediction[:,1]/a[:,3] , prediction[:,2]/a[:,3] , prediction[:,3]/a[:,3] ] , density=True , histtype='step' , color=['r', 'g' , 'b', 'y' ] , label=self.Tasks.all_actions  )
+        plt.hist( [ prediction[:,0]/a[:,2] , prediction[:,1]/a[:,2] , prediction[:,2]/a[:,2] ] , density=True , histtype='step' , color=['r', 'g' , 'b' ] , label=self.Tasks.all_actions  )
         plt.legend(loc='best')
         plt.title( "Predictions for " + self.Tasks.all_actions[ACTION_INDEX] + " actions")
         return self.AllFigures[figName]
@@ -347,7 +361,7 @@ class DNNTrain :
             print(average_per_true)
 
 
-    def SaveModel(self, file_name , model_details , trainingdata_details):
+    def SaveModel(self, file_name , model_details , trainingdata_details , skipfirstbins=0):
         """
         Save the model to two files :
         one hdf5 file and one json file under the models subdirectory of the current package are created with file_name
@@ -373,7 +387,7 @@ class DNNTrain :
         if not os.path.isdir( SitesErrorCodes_path + "/models/" + file_name ):
             os.mkdir( SitesErrorCodes_path + "/models/" + file_name )
         plt.switch_backend('agg')
-        self.PlotFitAndTestMetrics().savefig( SitesErrorCodes_path + "/models/" + file_name + '/Metrics.png' )
+        self.PlotFitAndTestMetrics(skipfirstbins=skipfirstbins).savefig( SitesErrorCodes_path + "/models/" + file_name + '/Metrics.png' )
         if self.Tasks.IsBinary:
             self.ROC().savefig( SitesErrorCodes_path + "/models/" + file_name + '/ROC.png' )
             self.OverTrainingPlot().savefig( SitesErrorCodes_path + "/models/" + file_name + '/OverTrainingPlot.png' )
@@ -382,3 +396,6 @@ class DNNTrain :
                 self.PlotPredictionForActions( action_index , 0 ).savefig( SitesErrorCodes_path + "/models/" + file_name + "/pred_for_action%d_intest.png" % action_index )
                 self.PlotPredictionForActions( action_index , 1 ).savefig( SitesErrorCodes_path + "/models/" + file_name + "/pred_for_action%d_intrain.png" % action_index )
                 self.PlotPredictionForActions( action_index , 2 ).savefig( SitesErrorCodes_path + "/models/" + file_name + "/pred_for_action%d_inall.png" % action_index )
+
+
+                
