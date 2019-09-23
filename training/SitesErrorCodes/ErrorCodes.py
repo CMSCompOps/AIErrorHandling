@@ -1,12 +1,24 @@
+#https://workflowwebtools.readthedocs.io/en/latest/workflow_procedures.html
+#https://docs.google.com/spreadsheets/d/1onZky6rW2z7NRvvQaLrBGaS8iFfYSg_EL71F1l3mTWE/edit#gid=0
+#https://twiki.cern.ch/twiki/bin/view/CMSPublic/JobExitCodes
 ErrorCodes = {
+    73:"RootEmbeddedFileSequence: secondary file list seems to be missing. When overflow procedure is enables, the agent should be able to see the secondary file set as present at those sites as well.",
+    84:"The file could not be found",
+    85:"If FileReadError, the file could not be read. If R__unzip: error, most likely a bad node with corrupted intermediate files.",
+    92:"File was not found and fallback procedure also failed.",
+
+    134:"Strong failure to report immediately",
+    137:"Likely an unrelated batch system kill. Sometimes a site-related problem.",
+    139:"Segmentation Violation, Segmentation Violation (usually problems with Singularity or CVMFS)",
+    
     7000:"CommandLineProcessing",
     7001:"ConfigFileNotFound",
     7002:"ConfigFileReadError",
     
-    8001:"OtherCMS",
-    8002:"StdException",
+    8001:"OtherCMS, EventGenerationFailure, External LHEpProducer Error,",
+    8002:"StdException, Site Issue",
     8003:"Unknown",
-    8004:"BadAlloc",
+    8004:"BadAlloc,virtual memory exhaustion",
     8005:"BadExceptionType",
     
     8006:"ProductNotFound",
@@ -19,14 +31,14 @@ ErrorCodes = {
     8013:"NullPointerError",
     8014:"NoProductSpecified",
     8015:"EventTimeout",
-    8016:"EventCorruption",
+    8016:"EventCorruption Geant4 error",
 
     8017:"ScheduleExecutionFailure",
     8018:"EventProcessorFailure",
 
     8019:"FileInPathError",
     8020:"FileOpenError",
-    8021:"FileReadError",
+    8021:"FileReadError, site issue",
     8022:"FatalRootError",
     8023:"MismatchedInputFiles",
     
@@ -38,7 +50,7 @@ ErrorCodes = {
     8028:"FallbackFileOpenError",
 
     8033:"FileWriteError", #Could not write output file (FileWriteError) (usually local disk problem)",
-
+    8501:"EventGenerationFailure",
     
     10001:"Connectivity problems",
     10002:"CPU load is too high",
@@ -75,18 +87,21 @@ ErrorCodes = {
     10053:"WARNING CPU load of last minutes + pilot cores is higher than number of physical CPUs",
     10054:"WARNING proxy shorther than 6 hours",
 
+    11003:"JobExtraction failures",
+    
+    
     
     50110:"Executable not found",
     50111:"no exe permissions", #Executable file has
     50113:"Executable did not get enough arguments",
     50115:"cmsRun segfaulted", #cmsRun did not produce a valid job report at runtime (often means 
     50116:"No exit code from cmsRun", #Could not determine exit code of cmsRun executable at runtime",
-    50513:"Failure in SCRAM", #"Failure to run SCRAM setup scripts",
-    50660:"RAM problem (wrapper)", #Application terminated by wrapper because using too much RAM (RSS)",
+    50513:"Failure in SCRAM setup scripts", #"Failure to run SCRAM setup scripts",
+    50660:"RAM problem (wrapper)", #Application terminated by wrapper because using too much RAM (RSS)", Performance kill: Job exceeding maxRSS
     50661:"VSIZE problem (wrapper)" , #Application terminated by wrapper because using too much Virtual Memory (VSIZE)",
     50662:"DISK usage (wrapper)", #Application terminated by wrapper because using too much disk",
     50663:"CPU Time (wrapper)", #Application terminated by wrapper because using too much CPU time",
-    50664:"Wall clock time (wrapper)" , #Application terminated by wrapper because using too much Wall Clock time",
+    50664:"Wall clock time (wrapper) stage out error" , #Application terminated by wrapper because using too much Wall Clock time",
     50665:"Application terminated by wrapper because it stay idle too long",
     50669:"Application terminated by wrapper for not defined reason",
 
@@ -94,7 +109,7 @@ ErrorCodes = {
     60302:"Output file(s) not found (see HERE.)",
     60307:"Failed to copy an output", # file to the SE (sometimes caused by timeout issue). Or by the issues mentioned HERE.",
     60311:"Local Stage Out Failure using site specific plugin",
-    60312:"Failed to get file TURL via lcg-lr command",
+    60312:"Failed to get file TURL via lcg-lr command, LogCollect error",
     60315:"ProdAgent StageOut initialisation error (Due to TFC, SITECONF etc)",
     60316:"Failed to create a directory on the SE",
     60317:"Forced timeout for stuck stage out",
@@ -113,21 +128,24 @@ ErrorCodes = {
     60407:"Timeout in staging in log files during log collection (WMAgent)",
     60408:"Failure to stage out of log files during log collection (WMAgent)",
     60409:"Timeout in stage out of log files during log collection (WMAgent)",
-    60450:"No output reported",# files present in the report",
+    60450:"No output reported skipped file",# files present in the report",
     60451:"Output file lacked adler32 checksum (WMAgent)",
 
+    61202:"Cant determine proxy filename. X509 user proxy required for job.",
     
     71101:"No suitable site found to submit", #No sites are available to submit the job because the location of its input(s) do not pass the site whitelist/blacklist restrictions (WMAgent) Twas 61101",
     71102:"Suitable site is aborted" , #The job can only run at a site that is currently in Aborted state (WMAgent)",
     71103:"Job pickle can't be loaded by JobSubmitter",
-    71104:"Suitable site is in Draining" , #The job can run only at a site that is currently in Draining state (WMAgent)",
+    71104:"Suitable site is in Draining" , #The job can run only at a site that is currently in Draining state (WMAgent)",Site containing only available copy of input datasets is in drain.
     71300:"The job was killed by the WMAgent, reason is unknown (WMAgent)",
     71301:"The job was killed by the WMAgent because the site it was running at was set to Aborted (WMAgent)",
     71302:"Site is going to Draining state", #The job was killed by the WMAgent because the site it was running at was set to Draining (WMAgent)",
     71303:"Site is going Down", #The job was killed by the WMAgent because the site it was running at was set to Down (WMAgent)",
     71304:"Wall clock time", #The job was killed by the WMAgent for using too much wallclock time (WMAgent)",
+    71305:"Wall clock time", #The job was killed by the WMAgent for using too much wallclock time (WMAgent)",
+    71306:"Wall clock time", #The job was killed by the WMAgent for using too much wallclock time (WMAgent)",
     70318:"Failure in DQM upload.",
-    70452:"No run/lumi information in file ",
+    70452:"No run/lumi information in file - Merge Issue",
 
     
     80000:"Internal error in CRAB job wrapper",
@@ -136,7 +154,10 @@ ErrorCodes = {
 
     
     90000:"Error in CRAB3 post-processing step (currently includes basically errors in stage out and file metadata upload).",
-    99109:"Uncaught exception by WMAgent", # step executor"
+    99109:"Uncaught exception by WMAgent,stage out error, site error", # step executor" (often staging out problems),
+    99303:"The agent has not found the JobReport.x.pkl file. Regardless of the status of the job, it will fail the job with 99303. Work is needed to make this error as rare as possible since there are very limited cases to make the file fail to appear.",
+    99304:"Site issue	No Job Report & specific case we don't even have job cache directory",
+    
 }
 
 def ErrorRange(err):
