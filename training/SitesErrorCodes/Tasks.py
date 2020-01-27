@@ -83,7 +83,10 @@ class Task:
             self.error_tensor = np.zeros( (len(all_errors) , len(all_sites) ,2 ) )
         for good_bad,errs in {0:errs_goodsites,1:errs_badsites}.items() :       
             for err in errs :
-                errcode = all_errors.index( int(err) )
+                try:
+                    errcode = all_errors.index( int(err) )
+                except ValueError:
+                    errcode = 0
                 sites = self.error_tensor[errcode]
                 for site in errs[err]:
                     if TiersOnly:
@@ -92,7 +95,10 @@ class Task:
                         except ValueError as errorrrr:
                             site_index = 4
                     else:
-                        site_index = all_sites.index( site )
+                        try:
+                            site_index = all_sites.index( site )
+                        except ValueError:
+                            site_index = 0
                     count = errs[err][site]
                     sites[site_index][good_bad] +=  count
     
