@@ -40,7 +40,7 @@ class SiteErrorCodeModelLoader :
         self.ModelID = int( JSON['model'] )
         self.InputTrainingDataID = int( JSON['trainingdata'])
 
-        self.Prediction = Prediction.Prediction( self.ModelID , self.InputTrainingDataID ) 
+        self.Prediction = Prediction.Prediction( self.ModelID , self.InputTrainingDataID , self.Name )
         
     def __call__(self , good_sites={} , bad_sites={} , wf=None , tsk=None , sourcejson=None):
         """
@@ -88,6 +88,13 @@ class SiteErrorCodeModelLoader :
         PRED = str(prediction)
         if self.IsBinary:
             PRED = self.all_actions[ prediction[0][0] > 0.5 ]
+        else:
+            sort_idx = prediction.argsort()[0]
+            max_idx = sort_idx[-1]
+            second_max_idx = sort_idx[-2]
+            prob_ratio = prediction[0][second_max_idx]/prediction[0][max_idx]
+            PRED = "{:s}({:.2f} {:s})".format( self.all_actions[max_idx] , prob_ratio , self.all_actions[second_max_idx] )
         self.Prediction.SetValues( PRED , "" , "" )
-        return str(self.Prediction)
+        return self.Prediction.GetDictionary()
+
 

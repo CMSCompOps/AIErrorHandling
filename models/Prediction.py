@@ -4,12 +4,13 @@ The `Prediction` class provides the data structure of the information that shoul
 """
 
 class Prediction:    
-    def __init__(self , ModelID , InputTrainingDatasetID):
+    def __init__(self , ModelID , InputTrainingDatasetID , model_file_name):
         """
         creates and instance of the prediction class
         :param int ModelID: the integer id of the model. this value will be stored in database for future references. authors and developers should keep track of its values to make sense.
         :param int InputTrainingDatasetID: the integer id of the dataset that was used for training the model. this value will be stored in database for future references. authors and developers should keep track of its values to make sense.
         """
+        self.ModelFileName = model_file_name
         self.ModelID = ModelID
         self.InputTrainingDatasetID = InputTrainingDatasetID
         self.PredictedActionName = ""
@@ -27,9 +28,16 @@ class Prediction:
         self.Significance = Significance
         self.Details = Details
 
+    def GetDictionary(self):
+        ret = { 'value':self.PredictedActionName ,
+                'model_description_link': 'https://github.com/CMSCompOps/AIErrorHandling/tree/aieh_machine/training/SitesErrorCodes/models/' + self.ModelFileName + '.json' ,
+                'performance_outputs': 'https://github.com/CMSCompOps/AIErrorHandling/tree/aieh_machine/training/SitesErrorCodes/models/' + self.ModelFileName ,
+                }
+        return ret
+
     def __str__(self):
-        return str(self.PredictedActionName)
+        return str(self.GetDictionary())
 
 
     def __repr__(self):
-        return str(self.PredictedActionName)
+        return str(self.GetDictionary())
