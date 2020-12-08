@@ -3,6 +3,9 @@
 import os
 import sys
 
+from cmstoolbox import webtools
+
+webtools.USER_AGENT = "workflowwebtools-aieh"
 
 def main():
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'webapp.settings')
