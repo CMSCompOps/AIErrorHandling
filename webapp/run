@@ -1,2 +1,2 @@
-nohup python manage.py runserver aieh.cern.ch:8052 >myprogram.out 2>myprogram.err
+nohup python manage.py runserver wfrecovery.cern.ch:80 >myprogram.out 2>myprogram.err
 

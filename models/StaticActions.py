@@ -169,10 +169,7 @@ def ParseErrors(wfinfo, include_xrootds=False):
             if main_err in [-1,-2]:
                 if len( bad_sites ) == 0:
                     ret['parameters']['Reasons'].append( "unknown error, site is backup" )
-                    ret['parameters']['Action'] = 'acdc'
-                else:
-                    ret['parameters']['Reasons'].append( 'unknown error, site(s) not backup yet {0}'.format( bad_sites ) )
-                    ret['parameters']['Action'] = 'automatic-wait'
+                    ret['parameters']['Action'] = 'acdc'                  
             if main_err in [99303, 99304]:
                 ret['parameters']['Reasons'].append( "condor issue" )
                 ret['parameters']['Action'] = "acdc"
@@ -201,13 +198,71 @@ def ParseErrors(wfinfo, include_xrootds=False):
                 else:
                     ret['parameters']['Action'] = 'automatic-wait'
                     ret['parameters']['Reasons'].append( 'stage out error, site is not backup' )
-            elif main_err in [71104, 71105 , 71103]:
-                if len(bad_sites) == 0:
+
+    if main_err_ratio > 0.3:
+        ret['additional_info']['main_err'] = main_err
+        bad_sites = err_summary[main_err]['bad_sites']
+
+        if main_err in [71104, 71105 , 71103 , 71102 , 71302]:
+            if len(bad_sites) == 0:
+                ret['parameters']['Action'] = 'acdc'
+                ret['parameters']['Reasons'].append( 'site put into the drain, site is backup' )
+            else:
+                wfparams = wfinfo.get_workflow_parameters()
+                tskInfo = None
+                doAcdc = False
+                for tskId in range( len(sites_summary)+2 ):
+                    if "Task{0}".format( tskId) not in wfparams:
+                        continue
+                    tskInfo_ = wfparams[ "Task{0}".format( tskId) ]
+                    tskName_ = tskInfo_[ "TaskName" ] 
+                    GoodSites = []
+                    AllSites = []
+                    fullTaskName = ""
+                    for tsk in sites_summary:
+                        if tsk.endswith( tskName_ ):
+                            GoodSites = sites_summary[tsk]['good_sites']
+                            AllSites = sites_summary[tsk]['bad_sites']
+                            fullTaskName = tsk
+                    if fullTaskName == "":
+                        ret['parameters']['Reasons'].append( 'task {0} was not found in the taks list'.format(tskName_) )
+                        continue
+                    if 'MCPileup' in tskInfo_:
+                        secondaryInput = tskInfo_['MCPileup']
+                        if "minbias" in secondaryInput.lower():
+                            doAcdc = False
+                            tskInfo = fullTaskName
+                            ret['parameters']['Reasons'].append( 'task {0} MCPileUp is minbias {1}'.format(tskName_ , secondaryInput) )
+                        else: #len(GoodSites) == 0:
+                            nUSSites = 0
+                            for s in AllSites:
+                                if "_US_" in s:
+                                    nUSSites += 1
+
+                            sites_in_continent = ['T1_US_FNAL'] if nUSSites > 0 else ['T1_IT_CNAF' , 'T1_RU_JINR' , 'T1_DE_KIT' , 'T1_UK_RAL' , 'T1_ES_PIC' , 'T1_FR_CCIN2P3' ]
+                            sites_in_continent += GoodSites
+                            good_sites_in_continent = [site for site in sites_in_continent if sitereadiness.site_drain_status( trimSiteName(site) ) == 'enabled' ]
+
+                            if len(good_sites_in_continent)>0:
+                                doAcdc = True
+                                ret['parameters']['Parameters'][fullTaskName]['xrootd'] = 'yes'
+                                ret['parameters']['Parameters'][fullTaskName]['sites'] = good_sites_in_continent
+                                ret['parameters']['Reasons'].append( 'task {0} with non minbias MCPileUp can run on new sites with xrootd option = on'.format(tskName_) )
+                                ret['parameters']['Reasons'].append('while list: {0}'.format(','.join(good_sites_in_continent) ) )
+                            else:
+                                doAcdc = False
+                                ret['parameters']['Reasons'].append( 'task {0} with non minbias MCPileUp has to run in {1}, but there is no T1 available there'.format(tskName_ , 'US' if nUSSites>0 else 'EU') )
+                        #else:
+                        #    ret['parameters']['Reasons'].append( 'task {0} with nonminbias MCPileUp has already some good site in the list'.format(tskName_) )
+                    else:
+                        ret['parameters']['Reasons'].append( 'task {0} has no MCPileUp'.format(tskName_) )
+
+                if doAcdc:
                     ret['parameters']['Action'] = 'acdc'
-                    ret['parameters']['Reasons'].append( 'site put into the drain, site is backup' )
                 else:
                     ret['parameters']['Action'] = 'automatic-wait'
-                    ret['parameters']['Reasons'].append( 'site put into the drain, site is not backup' )
+
+                        
 
     #phase II
     if ret['parameters']['Action'] not in ['acdc' , 'automatic-wait']:
@@ -239,7 +294,7 @@ def ParseErrors(wfinfo, include_xrootds=False):
             ret['parameters']['Parameters'][tsk] = {'xrootd':'disabled' , 'sites':all_good_sites , 'bad_sites':all_bad_sites }
 
             if primaryInputDS == '':
-                if main_err in [8020 , 8021 , 8028 ] :
+                if main_err*1000000 in [8020 , 8021 , 8028 ] : #these error codes are out since 2nd of Feb, requested by Hassan : https://mattermost.web.cern.ch/tools-and-integ/pl/9ebs1wxgctfs3kbx6f6qgzwtur
                     if len( all_bad_sites ) == 0:
                         ret['parameters']['Action'] = 'acdc'
                         ret['parameters']['Reasons'].append( 'main err 8020,8021,8028 for task {0} and no site in drain'.format( tsk ) )
@@ -352,12 +407,12 @@ def getCachedWorkflows():
 
 import requests
 def getAssistantManualWorkflows():
-    r = requests.get("https://vocms0113.cern.ch/assistance_manual" , verify=False)
+    r = requests.get("https://wfrecovery.cern.ch/assistance_manual" , verify=False)
     for l in r.json():
         yield l
 
 def getAssistantManualRecoveredWorkflows():
-    r = requests.get("https://vocms0113.cern.ch/assistance_manual_recovered" , verify=False)
+    r = requests.get("https://wfrecovery.cern.ch/assistance_manual_recovered" , verify=False)
     for l in r.json():
         yield l
 
@@ -385,7 +440,7 @@ def listExistingWFs(request):
         wf_name = SubElement( wf_el , 'name')
         wf_name.text = name
         lnk_el = SubElement( wf_el, 'lnk' )
-        lnk_el.text = 'http://aieh.cern.ch:8052/static_action_details/?wf=' + name
+        lnk_el.text = 'http://wfrecovery.cern.ch:80/static_action_details/?wf=' + name
         wf_action = SubElement( wf_el , 'action' )
         wf_action.text = errors['parameters']['Action']
         wf_action_description = SubElement( wf_el , 'action_description')
@@ -394,8 +449,8 @@ def listExistingWFs(request):
         wf_main_err = SubElement(wf_el , 'main_err')
         wf_main_err.text = str( errors['additional_info'].get( 'main_err' , 'no-err' ) )
         wf_js = SubElement(wf_el , 'json')
-        wf_js.text = 'http://aieh.cern.ch:8052/static_action/?wf=' + name 
-        SubElement( wf_el , 'console' ).text = 'https://vocms0113.cern.ch/seeworkflow2/?workflow=' + name
+        wf_js.text = 'http://wfrecovery.cern.ch:80/static_action/?wf=' + name 
+        SubElement( wf_el , 'console' ).text = 'https://wfrecovery.cern.ch/seeworkflow2/?workflow=' + name
         SubElement( wf_el , 'unified' ).text = 'https://cms-unified.web.cern.ch/cms-unified/report/' + name
         SubElement( wf_el , 'wmstat' ).text = 'https://cmsweb.cern.ch/wmstatsserver/data/jobdetail/' + name
         SubElement( wf_el , 'xrootd' ).text = errors['additional_info'].get( 'xrootd' , '' ) 

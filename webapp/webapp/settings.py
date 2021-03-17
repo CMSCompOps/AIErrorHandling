@@ -24,7 +24,7 @@ SECRET_KEY = 'pof62boxt=+lbcb3n((7-=32p_5(wsz38*977sk9wpju0l29mt'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["aieh.cern.ch","localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["wfrecovery.cern.ch","localhost", "127.0.0.1"]
 # ALLOWED_HOSTS = ["localhost"]
 
 # Application definition
