@@ -12,6 +12,13 @@ import xml.dom.minidom as minidom
 
 sitereadiness.TIMESTAMP = None
 
+def wfs_dec21():
+    ret = []
+    with open('/home/aieh/AIErrorHandling/models/wfs_dec21') as f:
+        for l in f:
+            ret.append(l[:-1])
+    return ret
+
 def trimSiteName(site):
     parts = site.split('_')
     if len(parts) == 4:
@@ -92,9 +99,6 @@ def ParseErrors(wfinfo, include_xrootds=False):
     }
 
 
-    if ret['additional_info']['nBadSites'] != 0 and not include_xrootds:
-        return ret
-
     err_summary={}
     err_summary_pertask={}
     for tsk,errors in wfinfo.get_errors(True).items():
@@ -128,6 +132,43 @@ def ParseErrors(wfinfo, include_xrootds=False):
                 err_summary_pertask[tsk][err]['good_sites'].extend( err_gsites )
                 err_summary_pertask[tsk][err]['bad_sites'].extend( err_bsites )
 
+    #ret['additional_info']['errs50660'] = err_summary_pertask
+    if wfinfo.workflow in wfs_dec21():
+        ret['additional_info']['errs50660'] = err_summary_pertask
+        ret['additional_info']['in50660list'] = 1
+        tsksw50660 = {}
+        for tsk_,errs in err_summary_pertask.items():
+            tsk = tsk_[ len(wfinfo.workflow)+2: ]
+            if 50660 in errs:
+                has50660 = True
+                tsksw50660[tsk] = ret['parameters']['Parameters'][tsk]
+                tsksw50660[tsk]['memory'] = 3750
+                tsksw50660[tsk]['xrootd'] = 'enabled'
+            else:
+                tsksw50660[tsk] = ret['parameters']['Parameters'][tsk]
+        if len(tsksw50660) > 0:
+            return {'workflow': wfinfo.workflow,
+                    'parameters': {
+                        'Action': 'acdc',
+                        'Reasons': ['AIEH', '50660, december 2021 accident'],
+                        'ACDCs': [],
+                        'Parameters': tsksw50660
+                    },
+                    'additional_info':{
+                        'errors': {},
+                        'nBadSites': nBadSites( wfinfo ),
+                        'in50660list' : 1,
+                        'main_err' : 50660
+                        #'errs50660' : err_summary_pertask
+                    } }
+    else:
+        ret['additional_info']['in50660list'] = 0
+            
+    if ret['additional_info']['nBadSites'] != 0 and not include_xrootds:
+        return ret
+
+
+
     if -2 in err_summary.keys() and err_summary[-2]['sum'] == 0:
         err_summary[-2]['sum'] = 1
     total_errs = sum( [ err_summary[err]['sum'] for err in err_summary ] )
@@ -143,12 +184,15 @@ def ParseErrors(wfinfo, include_xrootds=False):
             errs[err]['good_sites'] = list(set( errs[err]['good_sites'] ) )
             errs[err]['bad_sites'] = list(set( errs[err]['bad_sites'] ) )
             errs[err]['ratio'] = float( errs[err]['sum']/total_errs_tsk )
-
+    main_errs_pertask = {}
+    for tsk,err_summary__ in err_summary_pertask.items():
+        err_summary_sorted_ = sorted( [(err,err_summary__[err]) for err in err_summary__ ] , key= lambda x: x[1]['ratio'] , reverse=True)
+        main_errs_pertask[ tsk ] = err_summary_sorted_[0] if len(err_summary_sorted_) else None
 
     #from now on, the phase I logic is followed
     err_summary_sorted = sorted( [(err,err_summary[err]) for err in err_summary ] , key= lambda x: x[1]['ratio'] , reverse=True)
     main_err = err_summary_sorted[0][0] if len(err_summary_sorted) else -10
-    main_err_ratio = err_summary_sorted[0][1]['ratio'] if len(err_summary_sorted) else 0
+    main_err_ratio = err_summary_sorted[0][1]['ratio'] if len(err_summary_sorted) else 0 #(-100 , 1)
 
     all_bad_sites = []
     for err in err_summary:
@@ -162,8 +206,11 @@ def ParseErrors(wfinfo, include_xrootds=False):
             ret['parameters']['Action'] = '-'
             ret['parameters']['Reasons'].append( 'task {0} has empty sitelist'.format( tsk ) )
 
+    accident_22Nov2021 = False
+    main_err_ratio_threshhold = 0.0 if accident_22Nov2021 else 0.3
+
     if ret['parameters']['Action'] != '-':
-        if main_err_ratio > 0.3:
+        if main_err_ratio > main_err_ratio_threshhold:
             ret['additional_info']['main_err'] = main_err
             bad_sites = err_summary[main_err]['bad_sites']
             if main_err in [-1,-2]:
@@ -191,13 +238,14 @@ def ParseErrors(wfinfo, include_xrootds=False):
                 else:
                     ret['parameters']['Action'] = "automatic-wait"
                     ret['parameters']['Reasons'].append("Timeout due to priority inversion, status is pending, multiple sites in drain {0}".format( bad_sites ) )
-            elif main_err in [99109]:
-                if len(bad_sites) == 0:
-                    ret['parameters']['Action'] = 'acdc'
-                    ret['parameters']['Reasons'].append( 'stage out error, site is not in drain' )
-                else:
-                    ret['parameters']['Action'] = 'automatic-wait'
-                    ret['parameters']['Reasons'].append( 'stage out error, site is not backup' )
+            # elif main_err in [99109]:
+            #     if len(bad_sites) == 0:
+            #         if any( [ste_ in err_summary[main_err]['good_sites'] for ste_ in ['T2_CH_CERN', 'T2_CH_CERN_HLT'] ] ):
+            #             ret['parameters']['Action'] = 'acdc'
+            #             ret['parameters']['Reasons'].append( 'stage out error, site is not in drain' )
+            #     else:
+            #         ret['parameters']['Action'] = 'automatic-wait'
+            #         ret['parameters']['Reasons'].append( 'stage out error, site is not backup' )
 
     if main_err_ratio > 0.3:
         ret['additional_info']['main_err'] = main_err
@@ -211,11 +259,19 @@ def ParseErrors(wfinfo, include_xrootds=False):
                 wfparams = wfinfo.get_workflow_parameters()
                 tskInfo = None
                 doAcdc = False
+                anyTaskWithMCPU = False
+                ret['parameters']['Reasons'].append( 'main error is {0} and {1} sites are in drain, trying to check other t1 sites {2}'.format( main_err , len(bad_sites) , len(sites_summary) ) )
                 for tskId in range( len(sites_summary)+2 ):
-                    if "Task{0}".format( tskId) not in wfparams:
-                        continue
-                    tskInfo_ = wfparams[ "Task{0}".format( tskId) ]
-                    tskName_ = tskInfo_[ "TaskName" ] 
+                    tag = "Task{0}".format( tskId)
+                    tskNameTag = "TaskName"
+                    if tag not in wfparams:
+                        tag = "Step{0}".format( tskId)
+                        tskNameTag = "Step"
+                        if tag not in wfparams:
+                            ret['parameters']['Reasons'].append( 'Task/Step{0} not found in wfinfo'.format(tskId) )
+                            continue
+                    tskInfo_ = wfparams[ tag ]
+                    tskName_ = tskInfo_[ "{0}Name".format(tskNameTag) ] 
                     GoodSites = []
                     AllSites = []
                     fullTaskName = ""
@@ -223,39 +279,61 @@ def ParseErrors(wfinfo, include_xrootds=False):
                         if tsk.endswith( tskName_ ):
                             GoodSites = sites_summary[tsk]['good_sites']
                             AllSites = sites_summary[tsk]['bad_sites']
+                            
+
+                    for tsk in err_summary_pertask:
+                        if tsk.endswith( tskName_ ):
                             fullTaskName = tsk
-                    if fullTaskName == "":
-                        ret['parameters']['Reasons'].append( 'task {0} was not found in the taks list'.format(tskName_) )
+                            ret['parameters']['Reasons'].append( 'tskSummary:{0}'.format(str(main_errs_pertask[tsk]) ))
+
+                    if fullTaskName in err_summary_pertask:
+                        mainTskErr = main_errs_pertask[fullTaskName][0]
+                        if mainTskErr not in [71104, 71105 , 71103 , 71102 , 71302]:
+                            ret['parameters']['Reasons'].append( 'task {0} skipped, main error is'.format(tskName_, mainTskErr) )
+                            continue
+                    else:
+                        ret['parameters']['Reasons'].append( 'a)task {0} was not found in the taks list'.format(fullTaskName) )
                         continue
+                    if fullTaskName == "":
+                        ret['parameters']['Reasons'].append( 'b)task {0} was not found in the taks list'.format(tskName_) )
+                        continue
+
+                    ret['parameters']['Reasons'].append( 'task {0} is found to be the taks with this main error'.format(tskName_) )
+
                     if 'MCPileup' in tskInfo_:
                         secondaryInput = tskInfo_['MCPileup']
+                        tskInfo = fullTaskName
+                        anyTaskWithMCPU = True
                         if "minbias" in secondaryInput.lower():
-                            doAcdc = False
-                            tskInfo = fullTaskName
+                            #doAcdc = False
                             ret['parameters']['Reasons'].append( 'task {0} MCPileUp is minbias {1}'.format(tskName_ , secondaryInput) )
-                        else: #len(GoodSites) == 0:
-                            nUSSites = 0
-                            for s in AllSites:
-                                if "_US_" in s:
-                                    nUSSites += 1
+                            continue
+                        #else: #len(GoodSites) == 0:
 
-                            sites_in_continent = ['T1_US_FNAL'] if nUSSites > 0 else ['T1_IT_CNAF' , 'T1_RU_JINR' , 'T1_DE_KIT' , 'T1_UK_RAL' , 'T1_ES_PIC' , 'T1_FR_CCIN2P3' ]
-                            sites_in_continent += GoodSites
-                            good_sites_in_continent = [site for site in sites_in_continent if sitereadiness.site_drain_status( trimSiteName(site) ) == 'enabled' ]
 
-                            if len(good_sites_in_continent)>0:
-                                doAcdc = True
-                                ret['parameters']['Parameters'][fullTaskName]['xrootd'] = 'yes'
-                                ret['parameters']['Parameters'][fullTaskName]['sites'] = good_sites_in_continent
-                                ret['parameters']['Reasons'].append( 'task {0} with non minbias MCPileUp can run on new sites with xrootd option = on'.format(tskName_) )
-                                ret['parameters']['Reasons'].append('while list: {0}'.format(','.join(good_sites_in_continent) ) )
-                            else:
-                                doAcdc = False
-                                ret['parameters']['Reasons'].append( 'task {0} with non minbias MCPileUp has to run in {1}, but there is no T1 available there'.format(tskName_ , 'US' if nUSSites>0 else 'EU') )
+                    nUSSites = 0
+                    for s in AllSites:
+                        if "_US_" in s:
+                            nUSSites += 1
+                    sites_in_continent = ['T1_US_FNAL'] if nUSSites > 0 else ['T1_IT_CNAF' , 'T1_RU_JINR' , 'T1_DE_KIT' , 'T1_UK_RAL' , 'T1_ES_PIC' , 'T1_FR_CCIN2P3' ]
+                    sites_in_continent += GoodSites
+                    good_sites_in_continent = [trimSiteName(site) for site in sites_in_continent if sitereadiness.site_drain_status( trimSiteName(site) ) == 'enabled' ]
+                    good_sites_in_continent = list( set(good_sites_in_continent) )
+
+                    if len(good_sites_in_continent)>0:
+                        doAcdc = True
+                        #ret['parameters']['Reasons'].append( 'task {0} with non minbias MCPileUp can run on new sites with xrootd option = on / {1}'.format(tskName_ , ','.join([a for a in ret['parameters']['Parameters']])) )
+                        ret['parameters']['Parameters'][tskName_]['xrootd'] = 'yes'
+                        ret['parameters']['Parameters'][tskName_]['sites'] = good_sites_in_continent
+                        ret['parameters']['Reasons'].append( 'task {0} with non minbias MCPileUp can run on new sites with xrootd option = on'.format(tskName_) )
+                        ret['parameters']['Reasons'].append('while list: {0}'.format(','.join(good_sites_in_continent) ) )
+                    else:
+                        doAcdc = False
+                        ret['parameters']['Reasons'].append( 'task {0} with non minbias MCPileUp has to run in {1}, but there is no T1 available there'.format(tskName_ , 'US' if nUSSites>0 else 'EU') )
                         #else:
                         #    ret['parameters']['Reasons'].append( 'task {0} with nonminbias MCPileUp has already some good site in the list'.format(tskName_) )
-                    else:
-                        ret['parameters']['Reasons'].append( 'task {0} has no MCPileUp'.format(tskName_) )
+                        #else:
+                        #ret['parameters']['Reasons'].append( 'task {0} has no MCPileUp'.format(tskName_) )
 
                 if doAcdc:
                     ret['parameters']['Action'] = 'acdc'
@@ -294,7 +372,7 @@ def ParseErrors(wfinfo, include_xrootds=False):
             ret['parameters']['Parameters'][tsk] = {'xrootd':'disabled' , 'sites':all_good_sites , 'bad_sites':all_bad_sites }
 
             if primaryInputDS == '':
-                if main_err*1000000 in [8020 , 8021 , 8028 ] : #these error codes are out since 2nd of Feb, requested by Hassan : https://mattermost.web.cern.ch/tools-and-integ/pl/9ebs1wxgctfs3kbx6f6qgzwtur
+                if main_err*100000 in [8020 , 8021 , 8028 ] : #these error codes are out since 2nd of Feb, requested by Hassan : https://mattermost.web.cern.ch/tools-and-integ/pl/9ebs1wxgctfs3kbx6f6qgzwtur
                     if len( all_bad_sites ) == 0:
                         ret['parameters']['Action'] = 'acdc'
                         ret['parameters']['Reasons'].append( 'main err 8020,8021,8028 for task {0} and no site in drain'.format( tsk ) )
@@ -343,7 +421,9 @@ def summary(request):
         return HttpResponseBadRequest("please set the workflow by passing the wf argument")
 
     wfinfo = workflowinfo.WorkflowInfo( wf )
-    pred = ParseErrors( wfinfo , True )
+
+    xrootd=request.GET.get('xrootd' , False)
+    pred = ParseErrors( wfinfo , xrootd )
     root = Element('workflow')
     SubElement(root , 'name').text = wf
     errs = SubElement( root , 'errors' )
